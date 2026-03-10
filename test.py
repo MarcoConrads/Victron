@@ -9,16 +9,13 @@ UNIT_ID = 1
 REGISTER = 30062
 REGISTER_COUNT = 12  # 24 bytes string = 12 registers
 
-# Modbus libraries gebruiken meestal 0-based input registers
-MODBUS_OFFSET = REGISTER - 30001
-
 client = ModbusTcpClient(HOST, port=PORT)
 
 if not client.connect():
     print("Connection failed")
     exit(1)
 
-result = client.read_input_registers(MODBUS_OFFSET, REGISTER_COUNT, unit=UNIT_ID)
+result = client.read_input_registers(REGISTER, REGISTER_COUNT, unit=UNIT_ID)
 
 if result.isError():
     print("Modbus read error:", result)
