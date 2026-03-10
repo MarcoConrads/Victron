@@ -1,7 +1,7 @@
 from pymodbus.client.sync import ModbusTcpClient
 
 # Peblar IP adres
-HOST = "192.168.1.66"
+HOST = "192.168.11.66"
 PORT = 502
 UNIT_ID = 1
 
