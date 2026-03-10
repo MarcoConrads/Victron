@@ -1,35 +1,58 @@
 from pymodbus.client.sync import ModbusTcpClient
 
-# Peblar IP adres
-HOST = "192.168.11.66"
+HOST = "192.168.11.66"   # pas aan
 PORT = 502
 UNIT_ID = 1
 
-# ProductPn register
-REGISTER = 30062
-REGISTER_COUNT = 12  # 24 bytes string = 12 registers
+# Registers
+PRODUCT_REGISTER = 30062
+PRODUCT_COUNT = 12        # string24 = 12 registers
 
-client = ModbusTcpClient(HOST, port=PORT)
+API_VERSION_REGISTER = 30123
+API_VERSION_COUNT = 1
 
-if not client.connect():
-    print("Connection failed")
-    exit(1)
+# Modbus input registers beginnen bij 30001 → offset berekenen
+PRODUCT_ADDRESS = PRODUCT_REGISTER
+API_ADDRESS = API_VERSION_REGISTER
 
-result = client.read_input_registers(REGISTER, REGISTER_COUNT, unit=UNIT_ID)
 
-if result.isError():
-    print("Modbus read error:", result)
-else:
-    regs = result.registers
-
-    # registers → bytes
+def registers_to_string(registers):
     data = bytearray()
-    for r in regs:
-        data.append((r >> 8) & 0xFF)
-        data.append(r & 0xFF)
+    for reg in registers:
+        data.append((reg >> 8) & 0xFF)
+        data.append(reg & 0xFF)
+    return data.decode("utf-8", errors="ignore").strip("\x00 ").strip()
 
-    product = data.decode("utf-8", errors="ignore").strip("\x00 ").strip()
 
-    print("ProductPn:", product)
+def main():
+    client = ModbusTcpClient(HOST, port=PORT)
 
-client.close()
+    if not client.connect():
+        print("Connection failed")
+        return
+
+    try:
+        # ---- ProductPn ----
+        result = client.read_input_registers(PRODUCT_ADDRESS, PRODUCT_COUNT, unit=UNIT_ID)
+
+        if result.isError():
+            print("Error reading ProductPn:", result)
+        else:
+            product = registers_to_string(result.registers)
+            print("ProductPn:", product)
+
+        # ---- API Version ----
+        result = client.read_input_registers(API_ADDRESS, API_VERSION_COUNT, unit=UNIT_ID)
+
+        if result.isError():
+            print("Error reading ModbusApiVersionMajor:", result)
+        else:
+            api_version = result.registers[0]
+            print("ModbusApiVersionMajor:", api_version)
+
+    finally:
+        client.close()
+
+
+if __name__ == "__main__":
+    main()
