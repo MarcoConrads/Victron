@@ -1,4 +1,4 @@
-from pymodbus.client.tcp import ModbusTcpClient
+from pymodbus.client import ModbusTcpClient
 
 # Peblar IP adres
 HOST = "192.168.1.66"
