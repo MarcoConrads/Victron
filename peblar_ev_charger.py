@@ -3,6 +3,7 @@ from __future__ import annotations
 from enum import IntEnum
 
 import device
+import mdns
 import probe
 from register import Reg, Reg_text, Reg_u16, Reg_u32b, Reg_s32b, Reg_s64b
 
@@ -164,8 +165,8 @@ class PeblarEVCharger(device.ModbusDevice):
         # Expose as:
         #   /SetCurrent in A (writeable)
         #   /MaxCurrent in A (writeable) - alias to /SetCurrent for UI compatibility
-        set_current = Reg_u32b(40000, "/SetCurrent", 1000, "%.1f A", write=(0, 32))
-        max_current = Reg_u32b(40000, "/MaxCurrent", 1000, "%.1f A", write=(0, 32))
+        set_current = Reg_u32b(40000, "/SetCurrent", 1000, "%.1f A", write=(0, 32), access="holding")
+        max_current = Reg_u32b(40000, "/MaxCurrent", 1000, "%.1f A", write=(0, 32), access="holding")
 
         # /StartStop based on same 40000 register, with custom write behavior
         start_stop = PeblarStartStopReg(40000, "/StartStop", scale=1000, text="%d")
@@ -183,19 +184,19 @@ class PeblarEVCharger(device.ModbusDevice):
             Reg_s32b(30020, "/Ac/L3/Voltage", 1, "%d V", access="input"),
 
             # Peblar currents are mA (int32) -> expose as A
-            Reg_s32b(30022, "/Ac/L1/Current", 1000, "%.2f A", access="input"),
-            Reg_s32b(30024, "/Ac/L2/Current", 1000, "%.2f A", access="input"),
-            Reg_s32b(30026, "/Ac/L3/Current", 1000, "%.2f A", access="input"),
+            Reg_s32b(30022, "/Current", 1000, "%.2f A", access="input"),
+            # Reg_s32b(30024, "/Ac/L2/Current", 1000, "%.2f A", access="input"),
+            # Reg_s32b(30026, "/Ac/L3/Current", 1000, "%.2f A", access="input"),
 
             # Energy: Wh -> kWh (divide by 1000)
             Reg_s64b(30000, "/Ac/Energy/Forward", 1000, "%.3f kWh", access="input"),
-            Reg_s64b(30004, "/Session/Energy", 1000, "%.3f kWh", access="input"),
+            #Reg_s64b(30004, "/Session/Energy", 1000, "%.3f kWh", access="input"),
 
             # Status :contentReference[oaicite:23]{index=23}
-            PeblarCpStatusReg(30110, "/Status"),
+            # PeblarCpStatusReg(30110, "/Status", access="input"),
 
             # Actual communicated current to EV: mA uint32 -> A :contentReference[oaicite:24]{index=24}
-            Reg_u32b(30113, "/Current", 1000, "%.2f A"),
+            # Reg_u32b(30113, "/Current", 1000, "%.2f A", access="input"),
 
             # Control paths (Holding) :contentReference[oaicite:25]{index=25}
             start_stop,
@@ -203,9 +204,9 @@ class PeblarEVCharger(device.ModbusDevice):
             max_current,
 
             # Optional Peblar extras
-            Reg_u16(40002, "/Force1Phase", write=(0, 1)),
-            Reg_u32b(40050, "/AliveTimeout", 1, "%d s", write=(0, 86400)),
-            Reg_s32b(40052, "/FallbackCurrent", 1000, "%.1f A", write=(0, 32)),
+            Reg_u16(40002, "/Force1Phase", write=(0, 1), access="holding"),
+            Reg_u32b(40050, "/AliveTimeout", 1, "%d s", write=(0, 86400), access="holding"),
+            Reg_s32b(40052, "/FallbackCurrent", 1000, "%.1f A", write=(0, 32), access="holding"),
         ]
 
         # Attach callable write handler for StartStop
@@ -215,9 +216,9 @@ class PeblarEVCharger(device.ModbusDevice):
         start_stop.write = _startstop_write
 
         # Nice-to-have: aliases so other parts of Venus UI still show total power under both paths
-        self.alias_regs = {
-            "/Ac/Power": ("/Ac/Power",),
-        }
+        #self.alias_regs = {
+        #    "/Ac/Power": ("/Ac/Power",),
+        #}
 
     def get_ident(self):
         # Stable id based on serial
@@ -235,7 +236,7 @@ models = {
 
 probe.add_handler(
     probe.ModelRegister(
-        Reg_u16(30123),  # ModbusApiVersionMajor :contentReference[oaicite:27]{index=27}
+        Reg_u16(30123, access="input"),  # ModbusApiVersionMajor :contentReference[oaicite:27]{index=27}
         models,
         methods=["tcp"],
         units=[1],
