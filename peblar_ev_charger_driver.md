@@ -36,7 +36,7 @@ The Peblar charger exposes a **Modbus TCP server (port 502)**.
 Characteristics:
 
   |Parameter    |Value|
-  ------------+------------
+  |------------|------------|
   |Protocol     |Modbus TCP|
   |Port         |502|
   |Unit ID      |1|
