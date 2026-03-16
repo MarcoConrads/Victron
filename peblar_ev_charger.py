@@ -4,9 +4,9 @@ from enum import IntEnum
 import time
 
 import device
-import mdns
 import probe
-from register import Reg_text, Reg_u16, Reg_u32b, Reg_s32b, Reg_s64b, Reg_e16
+from settingsdevice import SettingsDevice
+from register import Reg_text, Reg_u16, Reg_u32b, Reg_s32b, Reg_s64b
 
 # Re-use Victron EV charger semantics (subset)
 class EVC_CHARGE(IntEnum):
@@ -230,12 +230,94 @@ class PeblarEVCharger(device.ModbusDevice):
             except Exception:
                 pass
 
+    def handle_setting_changed(self, setting, oldvalue, newvalue):
+        print('handle_setting_changed')
+        if setting == 'maxcurrent':
+            self.settings['mode'] = int(newvalue)
+            try:
+                self.dbus['/Mode'] = self.settings['mode']
+            except Exception:
+                pass
+
+        if setting == 'position':
+            self.settings['position'] = int(newvalue)
+            try:
+                self.dbus['/Position'] = self.settings['position']
+            except Exception:
+                pass
+
+        if setting == 'maxcurrent':
+            self.settings['maxcurrent'] = int(newvalue)
+            try:
+                self.dbus['/MaxCurrent'] = self.settings['maxcurrent']
+            except Exception:
+                pass
+
+    def handle_mode_change(self, path, value):
+        try:
+            value = int(value)
+            if value not in (int(EVC_MODE.MANUAL), int(EVC_MODE.AUTO), int(EVC_MODE.SCHEDULED)):
+                return False
+
+            self.settings['mode'] = value
+            return True
+        except Exception:
+            return False
+
+    def handle_position_change(self, path, value):
+        try:
+            value = int(value)
+            if value not in (int(EVC_POSITION.OUTPUT), int(EVC_POSITION.INPUT)):
+                return False
+
+            self.settings['position'] = value
+            return True
+        except Exception:
+            return False
+
+    def handle_maxcurrent_change(self, path, value):
+        try:
+            value = int(value)
+            if not value <6 and value>32:
+                return False
+
+            self.settings['maxcurrent'] = value
+            return True
+        except Exception:
+            return False
+
+    def init_settings(self):
+        settings_path = '/Settings/Peblar'
+        SETTINGS = {
+            'position':  [settings_path + '/Position', 0, 0, 1],
+            'maxcurrent': [settings_path + '/MaxCurrent', 16, 6, 32],
+            'mode': [settings_path + '/Mode', 0, 0, 2],
+        }
+        self.settings.addSettings(SETTINGS)
+
     def init_dbus(self):
         super().init_dbus()
-        self.dbus.add_path('/Mode', EVC_MODE.MANUAL, writeable=False)
-        self.dbus.add_path('/MaxCurrent', 16, writeable=False)
-        self.dbus.add_path('/Position', EVC_POSITION.OUTPUT, writeable=False)
-        self.dbus.add_path('/PositionIsAdjustable', EVC_ADJ_POSITION.FIXED, writeable=False)
+        self.init_settings()
+
+        self.dbus.add_path(
+            '/Mode',
+            self.settings['mode'],
+            writeable=True,
+            onchangecallback=self.handle_mode_change
+        )
+        self.dbus.add_path(
+            '/MaxCurrent',
+            self.settings['maxcurrent'],
+            writeable=True,
+            onchangecallback=self.handle_maxcurrent_change
+        )
+        self.dbus.add_path(
+            '/Position',
+            self.settings['position'],
+            writeable=True,
+            onchangecallback=self.handle_position_change
+        )
+        self.dbus.add_path('/PositionIsAdjustable', EVC_ADJ_POSITION.ADJUSTABLE, writeable=True)
         self.dbus.add_path('/AutoStart', EVC_AUTO_START.ENABLED, writeable=False)
         self.dbus.add_path('/Session/Time', 0, writeable=False)
 
