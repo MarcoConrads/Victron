@@ -48,65 +48,65 @@ Characteristics:
 
 ## Information Registers
 
-  Register   Description        D‑Bus Path
-  ---------- ------------------ --------------------
-  30050      Serial number      `/Serial`
-  30062      Product number     `/ProductPn`
-  30074      Firmware version   `/FirmwareVersion`
-  30092      Phase count        `/PhaseCount`
+  |Register   |Description        |D‑Bus Path|
+  |----------|------------------|--------------------|
+  |30050      |Serial number      |`/Serial`|
+  |30062      |Product number     |`/ProductPn`|
+  |30074      |Firmware version   |`/FirmwareVersion`|
+  |30092      |Phase count        |`/PhaseCount`|
 
 ------------------------------------------------------------------------
 
 ## Electrical Measurements
 
-  Register   Description     D‑Bus Path
-  ---------- --------------- ------------------
-  30008      L1 power        `/Ac/L1/Power`
-  30010      L2 power        `/Ac/L2/Power`
-  30012      L3 power        `/Ac/L3/Power`
-  30014      Total power     `/Ac/Power`
-  30016      L1 voltage      `/Ac/L1/Voltage`
-  30018      L2 voltage      `/Ac/L2/Voltage`
-  30020      L3 voltage      `/Ac/L3/Voltage`
-  30022      Total current   `/Current`
-  30022      L1 current      `/Ac/L1/Current`
-  30024      L2 current      `/Ac/L2/Current`
-  30026      L3 current      `/Ac/L3/Current`
+  |Register   |Description     |D‑Bus Path
+  |----------|---------------|------------------|
+  |30008      |L1 power        |`/Ac/L1/Power`|
+  |30010      |L2 power        |`/Ac/L2/Power`|
+  |30012      |L3 power        |`/Ac/L3/Power`|
+  |30014      |Total power     |`/Ac/Power`|
+  |30016      |L1 voltage      |`/Ac/L1/Voltage`|
+  |30018      |L2 voltage      |`/Ac/L2/Voltage`|
+  |30020      |L3 voltage      |`/Ac/L3/Voltage`|
+  |30022      |Total current   |`/Current`|
+  |30022      |L1 current      |`/Ac/L1/Current`|
+  |30024     |L2 current      |`/Ac/L2/Current`|
+  |30026      |L3 current      |`/Ac/L3/Current`
 
 ------------------------------------------------------------------------
 
 ## Energy Counters
 
-  Register   Description      D‑Bus Path
-  ---------- ---------------- ----------------------
-  30000      Total energy     `/Ac/Energy/Forward`
-  30004      Session energy   `/Session/Energy`
+  |Register   |Description      |D‑Bus Path
+  |----------|----------------|----------------------|
+  |30000      |Total energy     |`/Ac/Energy/Forward`|
+  |30004      |Session energy   |`/Session/Energy`|
 
 ------------------------------------------------------------------------
 
 ## Charger Status
 
-  Register   Description   D‑Bus Path
-  ---------- ------------- ------------
-  30110      CP State      `/Status`
+  |Register   |Description   |D‑Bus Path|
+  |----------|-------------|------------|
+  |30110      |CP State      |`/Status`|
 
 CP states are translated to Victron EV charger status values:
 
-  CP State   Meaning
-  ---------- --------------
-  A          Disconnected
-  B          Connected
-  C/D        Charging
-  E/F/I      Fault
+  |CP State   |Meaning|
+  |----------|--------------|
+  |A          |Disconnected|
+  |B          |Connected|
+  |C/D        |Charging|
+  |E/F/I      |Fault|
 
 ------------------------------------------------------------------------
 
 # Control Registers
 
-  Register   Description          D‑Bus Path
-  ---------- -------------------- ---------------
-  40000      ChargeCurrentLimit   `/SetCurrent`
-  40000      ChargeCurrentLimit   `/StartStop`
+  |Register   |Description          |D‑Bus Path|
+  |----------|--------------------|---------------|
+  |40000      |ChargeCurrentLimit   |`/SetCurrent`|
+  |40000      |ChargeCurrentLimit   |`/StartStop`|
 
 This register represents the maximum charging current in **mA**.
 
@@ -116,17 +116,17 @@ This register represents the maximum charging current in **mA**.
 
 Important exposed paths:
 
-  Path                Description
-  ------------------- ---------------------------------
-  `/Mode`             Charger operating mode
-  `/SetCurrent`       Charging current setpoint
-  `/StartStop`        Start or stop charging
-  `/Current`          Actual charging current
-  `/Status`           Charger state
-  `/MaxCurrent`       Maximum allowed current
-  `/Position`         Charger direction
-  `/Session/Energy`   Energy delivered during session
-  `/Session/Time`     Charging session duration
+  |Path                |Description|
+  |-------------------|---------------------------------|
+  |`/Mode`             |Charger operating mode|
+  |`/SetCurrent`       |Charging current setpoint|
+  |`/StartStop`        |Start or stop charging|
+  |`/Current`          |Actual charging current|
+  |`/Status`           |Charger state|
+  |`/MaxCurrent`       |Maximum allowed current|
+  |`/Position`         |Charger direction|
+  |`/Session/Energy`   |Energy delivered during session|
+  |`/Session/Time`     |Charging session duration|
 
 ------------------------------------------------------------------------
 
@@ -138,11 +138,11 @@ The driver stores configuration using the Victron settings service:
 
 Stored values:
 
-  Setting      Path
-  ------------ -------------------------------
-  Position     `/Settings/Peblar/Position`
-  MaxCurrent   `/Settings/Peblar/MaxCurrent`
-  Mode         `/Settings/Peblar/Mode`
+  |Setting      |Path|
+  |------------|-------------------------------|
+  |Position     |`/Settings/Peblar/Position`|
+  |MaxCurrent   |`/Settings/Peblar/MaxCurrent`|
+  |Mode         |`/Settings/Peblar/Mode`|
 
 These values are restored when the driver restarts.
 
