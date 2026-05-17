@@ -4,6 +4,7 @@
 import sys
 import logging
 from gi.repository import GLib
+import dbus.mainloop.glib
 
 sys.path.insert(0, "/opt/victronenergy/dbus-systemcalc-py/ext/velib_python")
 sys.path.insert(0, "/data/velib_python")
@@ -409,22 +410,13 @@ class GrowattDbus:
 
 def main():
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s: %(message)s"
-    )
-
+def main():
+    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
     inverter = GrowattDbus()
-
-    GLib.timeout_add(
-        POLL_INTERVAL_MS,
-        inverter.poll
-    )
-
+    GLib.timeout_add(POLL_INTERVAL_MS, inverter.poll)
     inverter.poll()
-
     GLib.MainLoop().run()
-
 
 if __name__ == "__main__":
     main()
