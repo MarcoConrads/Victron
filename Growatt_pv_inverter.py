@@ -11,11 +11,7 @@ sys.path.insert(0, "/data/velib_python")
 
 from vedbus import VeDbusService
 
-try:
-    from pymodbus.client import ModbusTcpClient
-except ImportError:
-    from pymodbus.client.sync import ModbusTcpClient
-
+from pymodbus.client.sync import ModbusTcpClient
 
 # ============================================================
 # Configuration
@@ -45,6 +41,7 @@ REG = {
 
     # Status
     "status": 0,
+    "errorcode" : 105,
 
     # PV
     "pv1_voltage": 3,
@@ -58,6 +55,10 @@ REG = {
     # AC total
     "ac_power_total": 35,
     "grid_freq": 37,
+    "voltageRS": 50,
+    "voltageST": 51,
+    "voltageTR": 52,
+    "maxpower": 6,
 
     # L1
     "l1_voltage": 38,
@@ -80,8 +81,8 @@ REG = {
 
 
 # Holding register for total active power limit
-REG_POWER_LIMIT_TOTAL = 121
-POWER_LIMIT_SCALE = 1
+REG_POWER_LIMIT_TOTAL = 3
+POWER_LIMIT_SCALE = 100
 
 
 def u32(registers, index):
@@ -131,17 +132,11 @@ class GrowattDbus:
 
     def __init__(self):
 
-        self.client = ModbusTcpClient(
-            HOST,
-            port=PORT,
-            timeout=3
-        )
-
         service_name = (
             f"com.victronenergy.pvinverter.growatt_{DEVICE_INSTANCE}"
         )
 
-        self.service = VeDbusService(service_name)
+        self.service = VeDbusService(service_name, register=False)
 
         # ====================================================
         # Management
@@ -149,13 +144,14 @@ class GrowattDbus:
         self.service.add_path("/Mgmt/ProcessName", __file__)
         self.service.add_path("/Mgmt/ProcessVersion", "1.0")
         self.service.add_path("/Mgmt/Connection",f"Modbus TCP {HOST}:{PORT}, unit {UNIT_ID}")
+        self.service.add_path("/IsGenericEnergyMeter", 0)
 
         # ====================================================
         # Device Information
         # ====================================================
         self.service.add_path("/DeviceInstance", DEVICE_INSTANCE)
         self.service.add_path("/ProductName","Growatt 3-Phase Inverter")
-        self.service.add_path("/ProductId", "")
+        self.service.add_path("/ProductId", 0xA14A)
         self.service.add_path("/FirmwareVersion", "")
         self.service.add_path("/HardwareVersion", "")
         self.service.add_path("/Connected", 0)
@@ -165,7 +161,10 @@ class GrowattDbus:
         # Total AC
         # ====================================================
         self.service.add_path("/Ac/Power", 0.0)
+        self.service.add_path("/Ac/Current", 0.0)
+        self.service.add_path("/Ac/Voltage", 0.0)
         self.service.add_path("/Ac/Energy/Forward", 0.0)
+        self.service.add_path("/Ac/MaxPower", 0.0)
 
         # ====================================================
         # AC L1
@@ -209,28 +208,40 @@ class GrowattDbus:
         # Status
         # ====================================================
         self.service.add_path("/StatusCode", 0)
+        self.service.add_path("/ErrorCode", 0)
 
         # ====================================================
         # Writable Total Power Limit
         # ====================================================
         self.service.add_path("/Ac/PowerLimit",0.0,writeable=True,onchangecallback=self.set_power_limit)
 
+        self.service.register()
+
     def read_input_registers(self, start, count):
-        rr = self.client.read_input_registers(start,count,slave=UNIT_ID)
 
-        if rr.isError():
-            raise RuntimeError(rr)
-
-        return rr.registers
+        client = ModbusTcpClient(HOST, port=PORT, timeout=3)
+        try:
+            if not client.connect():
+                raise RuntimeError("Modbus TCP connect failed")
+            rr = client.read_input_registers(start, count, unit=UNIT_ID)
+            if rr.isError():
+                raise RuntimeError(rr)
+            return rr.registers
+        finally:
+            client.close()
 
     def read_holding_registers(self, start, count):
 
-        rr = self.client.read_holding_registers(start, count,slave=UNIT_ID)
-
-        if rr.isError():
-            raise RuntimeError(rr)
-
-        return rr.registers
+        client = ModbusTcpClient(HOST, port=PORT, timeout=3)
+        try:
+            if not client.connect():
+                raise RunTimeError("Modbus TCP connect failed")
+            rr = client.read_holding_registers(start, count,unit=UNIT_ID)
+            if rr.isError():
+                raise RuntimeError(rr)
+            return rr.registers
+        finally:
+            client.close()
 
     def set_power_limit(self, path, value):
 
@@ -247,17 +258,21 @@ class GrowattDbus:
                 watts / POWER_LIMIT_SCALE
             )
 
-            if not self.client.connect():
+            client = ModbusTcpClient(HOST, port=PORT, timeout=3)
+
+            if not client.connect():
                 logging.error(
                     "Unable to connect to inverter"
                 )
                 return False
 
-            rr = self.client.write_register(
+            rr = client.write_register(
                 REG_POWER_LIMIT_TOTAL,
                 register_value,
-                slave=UNIT_ID
+                unit=UNIT_ID
             )
+
+            client.close()
 
             if rr.isError():
                 logging.error(
@@ -288,25 +303,29 @@ class GrowattDbus:
 
         try:
 
-            if not self.client.connect():
-                raise RuntimeError(
-                    "Unable to connect to Modbus TCP"
-                )
-
             registers = self.read_input_registers(0, 125)
             holding = self.read_holding_registers(0, 125)
 
             # ====================================================
             # Device info
             # ====================================================
-            product_id = decode_ascii_registers(holding,REG["product_id"],5)
+            # product_id = decode_ascii_registers(holding,REG["product_id"],5)
             firmware_version = decode_ascii_registers(holding,REG["firmware_version"],3)
             hardware_version = decode_ascii_registers(holding,REG["hardware_version"],3)
 
             # ====================================================
             # Status
             # ====================================================
-            status = registers[REG["status"]]
+            statusGrowatt = registers[REG["status"]]
+            if statusGrowatt == 0: # waiting
+                status = 0
+            elif statusGrowatt == 1: #normal
+                status = 7
+            elif statusGrowatt == 3: #fault
+                status = 10
+
+            maxpower = u32(holding,REG["maxpower"]) / 10.0
+            errorcode = registers[REG["errorcode"]]
 
             # ====================================================
             # PV Inputs
@@ -323,6 +342,10 @@ class GrowattDbus:
             # Grid Frequency
             # ====================================================
             frequency = registers[REG["grid_freq"]] / 100.0
+            voltageRS = registers[REG["voltageRS"]] / 10.0
+            voltageST = registers[REG["voltageST"]] / 10.0
+            voltageTR = registers[REG["voltageTR"]] / 10.0
+            voltage = (voltageRS + voltageST + voltageTR) / 3.0
 
             # ====================================================
             # Phase L1
@@ -351,15 +374,17 @@ class GrowattDbus:
             total_power = s32(registers, REG["ac_power_total"]) / 10.0
             total_energy = u32(registers, REG["total_energy"]) / 10.0
             phase_energy = total_energy / 3.0
+            current = (l1_current + l2_current + l3_current) / 3.0
 
             # ====================================================
             # Update D-Bus
             # ====================================================
-            self.service["/ProductId"] = product_id
+            # self.service["/ProductId"] = product_id
             self.service["/FirmwareVersion"] = firmware_version
             self.service["/HardwareVersion"] = hardware_version
             self.service["/Connected"] = 1
             self.service["/StatusCode"] = status
+            self.service["/ErrorCode"] = errorcode
 
             # PV1
             self.service["/Dc/0/Voltage"] = pv1_voltage
@@ -374,6 +399,9 @@ class GrowattDbus:
             # Total AC
             self.service["/Ac/Power"] = total_power
             self.service["/Ac/Energy/Forward"] = total_energy
+            self.service["/Ac/Current"] = current
+            self.service["/Ac/Voltage"] = voltage
+            self.service["/Ac/MaxPower"] = maxpower 
 
             # L1
             self.service["/Ac/L1/Voltage"] = l1_voltage
@@ -408,7 +436,6 @@ class GrowattDbus:
         return True
 
 
-def main():
 
 def main():
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)

@@ -7,10 +7,10 @@ UNIT = 1
 client = ModbusTcpClient(HOST, port=PORT)
 
 def read_input(addr, count):
-    return client.read_input_registers(addr - 30001, count, unit=UNIT)
+    return client.read_input_registers(addr, count, unit=UNIT)
 
 def read_holding(addr, count):
-    return client.read_holding_registers(addr - 40001, count, unit=UNIT)
+    return client.read_holding_registers(addr, count, unit=UNIT)
 
 def regs_to_string(regs):
     data = bytearray()
