@@ -34,15 +34,13 @@ MAX_POWER_W = 10000
 
 # ============================================================
 # Growatt Modbus Registers
-# IMPORTANT:
-# Verify these addresses for your inverter model.
 # ============================================================
 
 REG = {
     # Device information
     "product_id": 23,
     "firmware_version": 9,
-    "hardware_version": 12,  
+    "hardware_version": 12,
 
     # Status
     "status": 0,
@@ -50,11 +48,11 @@ REG = {
     # PV
     "pv1_voltage": 3,
     "pv1_current": 4,
-    "pv1_power":5,
-  
+    "pv1_power": 5,
+
     "pv2_voltage": 7,
     "pv2_current": 8,
-    "pv2_power":5,
+    "pv2_power": 9,
 
     # AC total
     "ac_power_total": 35,
@@ -79,6 +77,7 @@ REG = {
     "total_energy": 53,
 }
 
+
 # Holding register for total active power limit
 REG_POWER_LIMIT_TOTAL = 121
 POWER_LIMIT_SCALE = 1
@@ -96,30 +95,51 @@ def s32(registers, index):
     Combine two 16-bit registers into signed 32-bit.
     """
     value = u32(registers, index)
+
     if value >= 0x80000000:
         value -= 0x100000000
+
     return value
 
- def decode_ascii_registers(registers, start, count):
+
+def decode_ascii_registers(registers, start, count):
     """
     Decode Modbus registers containing ASCII characters.
     Each 16-bit register contains two ASCII bytes.
     """
+
     result = ""
+
     for i in range(start, start + count):
+
         value = registers[i]
+
         high = (value >> 8) & 0xFF
         low = value & 0xFF
+
         if high != 0:
             result += chr(high)
+
         if low != 0:
             result += chr(low)
+
     return result.strip()
 
+
 class GrowattDbus:
+
     def __init__(self):
-        self.client = ModbusTcpClient(HOST, port=PORT, timeout=3)
-        service_name = f"com.victronenergy.pvinverter.growatt_{DEVICE_INSTANCE}"
+
+        self.client = ModbusTcpClient(
+            HOST,
+            port=PORT,
+            timeout=3
+        )
+
+        service_name = (
+            f"com.victronenergy.pvinverter.growatt_{DEVICE_INSTANCE}"
+        )
+
         self.service = VeDbusService(service_name)
 
         # ====================================================
@@ -127,19 +147,16 @@ class GrowattDbus:
         # ====================================================
         self.service.add_path("/Mgmt/ProcessName", __file__)
         self.service.add_path("/Mgmt/ProcessVersion", "1.0")
-        self.service.add_path(
-            "/Mgmt/Connection",
-            f"Modbus TCP {HOST}:{PORT}, unit {UNIT_ID}"
-        )
+        self.service.add_path("/Mgmt/Connection",f"Modbus TCP {HOST}:{PORT}, unit {UNIT_ID}")
 
         # ====================================================
         # Device Information
         # ====================================================
         self.service.add_path("/DeviceInstance", DEVICE_INSTANCE)
-        self.service.add_path("/ProductName", "Growatt 3-Phase Inverter")
-        self.service.add_path("/ProductId", 0)
-        self.service.add_path("/FirmwareVersion", "unknown")
-        self.service.add_path("/HardwareVersion", "unknown")
+        self.service.add_path("/ProductName","Growatt 3-Phase Inverter")
+        self.service.add_path("/ProductId", "")
+        self.service.add_path("/FirmwareVersion", "")
+        self.service.add_path("/HardwareVersion", "")
         self.service.add_path("/Connected", 0)
         self.service.add_path("/Position", POSITION)
 
@@ -195,85 +212,95 @@ class GrowattDbus:
         # ====================================================
         # Writable Total Power Limit
         # ====================================================
-        self.service.add_path(
-            "/Ac/PowerLimit",
-            0.0,
-            writeable=True,
-            onchangecallback=self.set_power_limit
-        )
+        self.service.add_path("/Ac/PowerLimit",0.0,writeable=True,onchangecallback=self.set_power_limit)
 
     def read_input_registers(self, start, count):
-        rr = self.client.read_input_registers(
-            start,
-            count,
-            slave=UNIT_ID
-        )
+        rr = self.client.read_input_registers(start,count,slave=UNIT_ID)
 
         if rr.isError():
             raise RuntimeError(rr)
+
         return rr.registers
-    
+
     def read_holding_registers(self, start, count):
-        rr = self.client.read_holding_registers(
-            start,
-            count,
-            slave=UNIT_ID
-        )
-    
+
+        rr = self.client.read_holding_registers(start, count,slave=UNIT_ID)
+
         if rr.isError():
             raise RuntimeError(rr)
 
-    return rr.registers  
+        return rr.registers
+
     def set_power_limit(self, path, value):
-        """
-        Set inverter total power limit.
-        """
+
         try:
             watts = int(float(value))
 
             if watts < 0:
                 watts = 0
+
             if watts > MAX_POWER_W:
                 watts = MAX_POWER_W
-            register_value = int(watts / POWER_LIMIT_SCALE)
+
+            register_value = int(
+                watts / POWER_LIMIT_SCALE
+            )
+
             if not self.client.connect():
-                logging.error("Unable to connect to inverter")
+                logging.error(
+                    "Unable to connect to inverter"
+                )
                 return False
+
             rr = self.client.write_register(
                 REG_POWER_LIMIT_TOTAL,
                 register_value,
                 slave=UNIT_ID
             )
+
             if rr.isError():
-                logging.error("Failed to write power limit: %s", rr)
+                logging.error(
+                    "Failed to write power limit: %s",
+                    rr
+                )
                 return False
+
             self.service["/Ac/PowerLimit"] = watts
+
             logging.info(
                 "3-phase power limit set to %s W",
                 watts
             )
+
             return True
 
         except Exception as e:
-            logging.exception("Power limit update failed: %s", e)
+
+            logging.exception(
+                "Power limit update failed: %s",
+                e
+            )
+
             return False
 
     def poll(self):
-        """
-        Poll inverter and publish values to D-Bus.
-        """
+
         try:
+
             if not self.client.connect():
-                raise RuntimeError("Unable to connect to Modbus TCP")
+                raise RuntimeError(
+                    "Unable to connect to Modbus TCP"
+                )
+
             registers = self.read_input_registers(0, 125)
             holding = self.read_holding_registers(0, 125)
-          
+
             # ====================================================
             # Device info
             # ====================================================
-            productId = decode_ascii_registers(holdings,REG["firmware_version"],5)
-            firmwareVersion = decode_ascii_registers(holdings,REG["firmware_version"],3)
-            hardwareVersion = decode_ascii_registers(holdings,REG["hardware_version"],3)
+            product_id = decode_ascii_registers(holding,REG["product_id"],5)
+            firmware_version = decode_ascii_registers(holding,REG["firmware_version"],3)
+            hardware_version = decode_ascii_registers(holding,REG["hardware_version"],3)
 
             # ====================================================
             # Status
@@ -284,7 +311,7 @@ class GrowattDbus:
             # PV Inputs
             # ====================================================
             pv1_voltage = registers[REG["pv1_voltage"]] / 10.0
-            pv1_current = registers[REG["pv1_current"]] / 10.0
+            pv1_current = registers[REG["pv1_current"]] / 10.
             pv1_power = s32(registers, REG["pv1_power"]) / 10.0
 
             pv2_voltage = registers[REG["pv2_voltage"]] / 10.0
@@ -309,7 +336,7 @@ class GrowattDbus:
             l2_voltage = registers[REG["l2_voltage"]] / 10.0
             l2_current = registers[REG["l2_current"]] / 10.0
             l2_power = s32(registers, REG["l2_power"]) / 10.0
-
+            
             # ====================================================
             # Phase L3
             # ====================================================
@@ -327,15 +354,12 @@ class GrowattDbus:
             # ====================================================
             # Update D-Bus
             # ====================================================
-
-            # device information
-            self.service["/ProductId"] = productId
-            self.service["/FirmwareVersion"] = firmwareVersion
-            self.service["/HardwareVersion"] = hardwareVersion
-      
+            self.service["/ProductId"] = product_id
+            self.service["/FirmwareVersion"] = firmware_version
+            self.service["/HardwareVersion"] = hardware_version
             self.service["/Connected"] = 1
             self.service["/StatusCode"] = status
-          
+
             # PV1
             self.service["/Dc/0/Voltage"] = pv1_voltage
             self.service["/Dc/0/Current"] = pv1_current
@@ -372,13 +396,19 @@ class GrowattDbus:
             self.service["/Ac/L3/Frequency"] = frequency
 
         except Exception as e:
-            logging.exception("Polling failed: %s", e)
+
+            logging.exception(
+                "Polling failed: %s",
+                e
+            )
+
             self.service["/Connected"] = 0
 
         return True
 
 
 def main():
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s: %(message)s"
@@ -390,7 +420,9 @@ def main():
         POLL_INTERVAL_MS,
         inverter.poll
     )
+
     inverter.poll()
+
     GLib.MainLoop().run()
 
 
