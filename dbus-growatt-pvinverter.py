@@ -4,12 +4,14 @@
 import sys
 import logging
 from gi.repository import GLib
+import dbus
 import dbus.mainloop.glib
 
 sys.path.insert(0, "/opt/victronenergy/dbus-systemcalc-py/ext/velib_python")
 sys.path.insert(0, "/data/velib_python")
 
 from vedbus import VeDbusService
+from settingsdevice import SettingsDevice
 from pymodbus.client.sync import ModbusTcpClient
 
 # ============================================================
@@ -22,8 +24,6 @@ UNIT_ID = 2
 
 DEVICE_INSTANCE = 48
 POLL_INTERVAL_MS = 1000
-
-POSITION = 1
 
 DEFAULT_MAX_POWER_W = 10000
 
@@ -59,6 +59,159 @@ REG_POWER_LIMIT_TOTAL = 3
 # values as fixed-point integers.
 
 REG = [
+    # Settings / local DBus-only values
+    {
+        "name": "custom_name",
+        "path": "/CustomName",
+        "address": None,
+        "length": 0,
+        "regtype": MB_NONE,
+        "encoding": None,
+        "default": "",
+        "on_error": ON_ERROR_KEEP,
+        "setting": "",
+        "setting_path": "/Settings/Devices/Growatt/CustomName",
+        "writeable": True,
+    },
+    {
+        "name": "position",
+        "path": "/Position",
+        "address": None,
+        "length": 0,
+        "regtype": MB_NONE,
+        "encoding": None,
+        "default": 1,
+        "on_error": ON_ERROR_KEEP,
+        "setting": 1,
+        "setting_path": "/Settings/Devices/Growatt/Position",
+        "setting_min": 0,
+        "setting_max": 2,
+        "writeable": True,
+        "cast": int,
+    },
+
+    # Static product / management information
+    {
+        "name": "process_name",
+        "path": "/Mgmt/ProcessName",
+        "address": None,
+        "length": 0,
+        "regtype": MB_NONE,
+        "encoding": "string",
+        "default": __file__,
+        "on_error": ON_ERROR_KEEP,
+    },
+    {
+        "name": "process_version",
+        "path": "/Mgmt/ProcessVersion",
+        "address": None,
+        "length": 0,
+        "regtype": MB_NONE,
+        "encoding": "string",
+        "default": "1.1",
+        "on_error": ON_ERROR_KEEP,
+    },
+    {
+        "name": "connection",
+        "path": "/Mgmt/Connection",
+        "address": None,
+        "length": 0,
+        "regtype": MB_NONE,
+        "encoding": "string",
+        "default": f"Modbus TCP {HOST}:{PORT}, unit {UNIT_ID}",
+        "on_error": ON_ERROR_KEEP,
+    },
+    {
+        "name": "ac_number_of_phases",
+        "path": "/Ac/NumberOfPhases",
+        "address": None,
+        "length": 0,
+        "regtype": MB_NONE,
+        "encoding": None,
+        "default": 3,
+        "on_error": ON_ERROR_KEEP,
+    },
+    {
+        "name": "data_manager_version",
+        "path": "/DataManagerVersion",
+        "address": None,
+        "length": 0,
+        "regtype": MB_NONE,
+        "encoding": None,
+        "default": "1.2.3.4.5.6",
+        "on_error": ON_ERROR_KEEP,
+    },
+    {
+        "name": "fronius_device_type",
+        "path": "/FroniusDeviceType",
+        "address": None,
+        "length": 0,
+        "regtype": MB_NONE,
+        "encoding": None,
+        "default": 73,
+        "on_error": ON_ERROR_KEEP,
+    },
+    {
+        "name": "limiter_model",
+        "path": "/Info/LimiterModel",
+        "address": None,
+        "length": 0,
+        "regtype": MB_NONE,
+        "encoding": None,
+        "default": 123,
+        "on_error": ON_ERROR_KEEP,
+    },
+    {
+        "name": "measurement_model",
+        "path": "/Info/MeasurementModel",
+        "address": None,
+        "length": 0,
+        "regtype": MB_NONE,
+        "encoding": None,
+        "default": 113,
+        "on_error": ON_ERROR_KEEP,
+    },
+    {
+        "name": "is_generic_energy_meter",
+        "path": "/IsGenericEnergyMeter",
+        "address": None,
+        "length": 0,
+        "regtype": MB_NONE,
+        "encoding": None,
+        "default": 0,
+        "on_error": ON_ERROR_KEEP,
+    },
+    {
+        "name": "product_name",
+        "path": "/ProductName",
+        "address": None,
+        "length": 0,
+        "regtype": MB_NONE,
+        "encoding": None,
+        "default": "Growatt 3-Phase Inverter",
+        "on_error": ON_ERROR_KEEP,
+    },
+    {
+        "name": "product_id",
+        "path": "/ProductId",
+        "address": None,
+        "length": 0,
+        "regtype": MB_NONE,
+        "encoding": None,
+        "default": 41282,
+        "on_error": ON_ERROR_KEEP,
+    },
+    {
+        "name": "deviceinstance",
+        "path": "/DeviceInstance",
+        "address": None,
+        "length": 0,
+        "regtype": MB_NONE,
+        "encoding": "u32",
+        "default": DEVICE_INSTANCE,
+        "on_error": ON_ERROR_KEEP,
+    },
+
     # Device information
     {
         "name": "firmware_version",
@@ -436,54 +589,82 @@ def decode_value(reg, values):
     return value
 
 
+
+def get_supported_settings(regs):
+    """Build SettingsDevice supportedSettings from REG entries."""
+    supported = {}
+
+    for reg in regs:
+        if "setting" not in reg:
+            continue
+
+        supported[reg["setting"]] = [
+            reg["setting_path"],
+            reg["default"],
+            reg.get("setting_min", 0),
+            reg.get("setting_max", 0),
+        ]
+
+    return supported
+
+
+def get_reg_default(reg, settings):
+    """Return REG default, overridden by SettingsDevice when configured."""
+    if "setting" not in reg:
+        return reg["default"]
+
+    value = settings[reg["setting"]]
+
+    if "cast" in reg:
+        try:
+            value = reg["cast"](value)
+        except Exception:
+            logging.warning(
+                "Invalid setting value for %s: %r, using default %r",
+                reg["setting"],
+                value,
+                reg["default"],
+            )
+            value = reg["default"]
+
+    return value
+
+
 class GrowattDbus:
 
     def __init__(self):
         service_name = f"com.victronenergy.pvinverter.growatt_{DEVICE_INSTANCE}"
+        self.bus = dbus.SystemBus()
         self.service = VeDbusService(service_name, register=False)
         self.modbus_messages = build_modbus_messages(REG)
         self.last_values = {}
-        self.max_power_w = DEFAULT_MAX_POWER_W
-
-        # ====================================================
-        # Management
-        # ====================================================
-        self.service.add_path("/Mgmt/ProcessName", __file__)
-        self.service.add_path("/Mgmt/ProcessVersion", "1.1")
-        self.service.add_path(
-            "/Mgmt/Connection",
-            f"Modbus TCP {HOST}:{PORT}, unit {UNIT_ID}",
+        self.settings = SettingsDevice(
+            self.bus,
+            get_supported_settings(REG),
+            self.handle_setting_changed,
         )
-
-        # ====================================================
-        # Product information based on Fronius DBus service, but with some fields left empty or with default values.
-        # ====================================================
-        self.service.add_path("/Ac/NumberOfPhases", 3)
-        self.service.add_path("/CustomName", "")
-        self.service.add_path("/DataManagerVersion", "1.2.3.4.5.6")
-        self.service.add_path("/FroniusDeviceType", 73)
-        self.service.add_path("/Info/LimiterModel", 123)
-        self.service.add_path("/Info/MeasurementModel", 113)
-
-        self.service.add_path("/IsGenericEnergyMeter", 0)
-        self.service.add_path("/ProductName", "Growatt 3-Phase Inverter")
-        self.service.add_path("/ProductId", 41282)
-        self.service.add_path("/Position", POSITION)
+        self.max_power_w = DEFAULT_MAX_POWER_W
 
         # ====================================================
         # Device Information
         # ====================================================
-        self.service.add_path("/DeviceInstance", DEVICE_INSTANCE)
         self.service.add_path("/Connected", 0)
 
-        # Add all DBus paths from REG. A path may be a string or a list.
+        # ====================================================
+        # REG
+        # ====================================================
         added_paths = set()
         for reg in REG:
             if reg.get("internal"):
                 continue
             for path in self.get_paths(reg):
                 if path not in added_paths:
-                    self.service.add_path(path, reg["default"])
+                    self.service.add_path(
+                        path,
+                        get_reg_default(reg, self.settings),
+                        writeable=bool(reg.get("writeable")),
+                        onchangecallback=self.set_setting_value if reg.get("writeable") else None,
+                    )
                     added_paths.add(path)
 
         # ====================================================
@@ -522,7 +703,7 @@ class GrowattDbus:
     def write_default_values_for_none_registers(self):
         for reg in REG:
             if reg["regtype"] is MB_NONE:
-                self.write_paths(reg, reg["default"])
+                self.write_paths(reg, get_reg_default(reg, self.settings))
 
     def read_modbus_message(self, client, message):
         start = message["start"]
@@ -547,7 +728,7 @@ class GrowattDbus:
             MB_HOLDING: {},
         }
 
-        client = ModbusTcpClient(HOST, port=PORT, timeout=3)
+        client = ModbusTcpClient(HOST, port=PORT, timeout=1)
         try:
             if not client.connect():
                 raise RuntimeError("Modbus TCP connect failed")
@@ -565,7 +746,7 @@ class GrowattDbus:
         """Apply per-register fallback behaviour after a Modbus read error."""
         for reg in REG:
             if reg["regtype"] is MB_NONE:
-                self.write_paths(reg, reg["default"])
+                self.write_paths(reg, get_reg_default(reg, self.settings))
                 continue
 
             if reg["on_error"] == ON_ERROR_DEFAULT:
@@ -577,8 +758,9 @@ class GrowattDbus:
 
         for reg in REG:
             if reg["regtype"] is MB_NONE:
-                self.write_paths(reg, reg["default"])
-                decoded[reg["name"]] = reg["default"]
+                value = get_reg_default(reg, self.settings)
+                self.write_paths(reg, value)
+                decoded[reg["name"]] = value
                 continue
 
             try:
@@ -622,6 +804,63 @@ class GrowattDbus:
             max_power_w = DEFAULT_MAX_POWER_W
 
         return max_power_w / 100.0
+
+    def handle_setting_changed(self, setting, oldvalue, newvalue):
+        """Update DBus when SettingsDevice changes externally."""
+        reg = self.get_reg_by_setting(setting)
+        if reg is None:
+            return
+
+        value = self.cast_reg_value(reg, newvalue)
+        for path in self.get_paths(reg):
+            self.service[path] = value
+
+        logging.info(
+            "Setting %s changed: %r -> %r",
+            setting,
+            oldvalue,
+            value,
+        )
+
+    @staticmethod
+    def get_reg_by_setting(setting):
+        for reg in REG:
+            if reg.get("setting") == setting:
+                return reg
+        return None
+
+    @staticmethod
+    def cast_reg_value(reg, value):
+        if "cast" not in reg:
+            return value
+
+        try:
+            return reg["cast"](value)
+        except Exception:
+            logging.warning(
+                "Invalid value for %s: %r, using default %r",
+                reg.get("setting", reg["name"]),
+                value,
+                reg["default"],
+            )
+            return reg["default"]
+
+    def set_setting_value(self, path, value):
+        """Persist writeable local DBus settings through SettingsDevice."""
+        try:
+            reg = next(
+                reg for reg in REG
+                if reg.get("writeable") and path in self.get_paths(reg)
+            )
+        except StopIteration:
+            logging.error("No writeable REG setting found for %s", path)
+            return False
+
+        value = self.cast_reg_value(reg, value)
+        self.settings[reg["setting"]] = value
+        self.service[path] = value
+        logging.info("Setting %s updated to %r", reg["setting"], value)
+        return True
 
     def set_power_limit(self, path, value):
         try:
