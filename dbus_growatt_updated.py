@@ -234,7 +234,7 @@ REG = [
         "regtype": MB_INPUT,
         "encoding": "u32",
         "default": 0.0,
-        "on_error": ON_ERROR_KEEP,
+        "on_error": ON_ERROR_DEFAULT,
         "scale": 100.0,
     },
     {
@@ -245,7 +245,7 @@ REG = [
         "regtype": MB_INPUT,
         "encoding": "u32",
         "default": 0.0,
-        "on_error": ON_ERROR_KEEP,
+        "on_error": ON_ERROR_DEFAULT,
         "scale": 10.0,
     },
     {
@@ -256,7 +256,7 @@ REG = [
         "regtype": MB_INPUT,
         "encoding": "u32",
         "default": 0.0,
-        "on_error": ON_ERROR_KEEP,
+        "on_error": ON_ERROR_DEFAULT,
         "scale": 10.0,
     },
     {
@@ -267,7 +267,7 @@ REG = [
         "regtype": MB_INPUT,
         "encoding": "s32",
         "default": 0.0,
-        "on_error": ON_ERROR_KEEP,
+        "on_error": ON_ERROR_DEFAULT,
         "scale": 10.0,
     },
     {
@@ -278,7 +278,7 @@ REG = [
         "regtype": MB_INPUT,
         "encoding": "u32",
         "default": 0.0,
-        "on_error": ON_ERROR_KEEP,
+        "on_error": ON_ERROR_DEFAULT,
         "scale": 10.0,
     },
     {
@@ -289,7 +289,7 @@ REG = [
         "regtype": MB_INPUT,
         "encoding": "u32",
         "default": 0.0,
-        "on_error": ON_ERROR_KEEP,
+        "on_error": ON_ERROR_DEFAULT,
         "scale": 10.0,
     },
     {
@@ -300,7 +300,7 @@ REG = [
         "regtype": MB_INPUT,
         "encoding": "s32",
         "default": 0.0,
-        "on_error": ON_ERROR_KEEP,
+        "on_error": ON_ERROR_DEFAULT,
         "scale": 10.0,
     },
     {
@@ -311,7 +311,7 @@ REG = [
         "regtype": MB_INPUT,
         "encoding": "u32",
         "default": 0.0,
-        "on_error": ON_ERROR_KEEP,
+        "on_error": ON_ERROR_DEFAULT,
         "scale": 10.0,
     },
     {
@@ -322,7 +322,7 @@ REG = [
         "regtype": MB_INPUT,
         "encoding": "u32",
         "default": 0.0,
-        "on_error": ON_ERROR_KEEP,
+        "on_error": ON_ERROR_DEFAULT,
         "scale": 10.0,
     },
     {
@@ -333,7 +333,7 @@ REG = [
         "regtype": MB_INPUT,
         "encoding": "s32",
         "default": 0.0,
-        "on_error": ON_ERROR_KEEP,
+        "on_error": ON_ERROR_DEFAULT,
         "scale": 10.0,
     },
 
