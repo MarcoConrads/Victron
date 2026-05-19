@@ -336,49 +336,6 @@ REG = [
         "on_error": ON_ERROR_DEFAULT,
         "scale": 10.0,
     },
-
-
-    # Paths without a Modbus register. These always write their default value.
-    {
-        "name": "is_generic_energy_meter",
-        "path": "/IsGenericEnergyMeter",
-        "address": None,
-        "length": 0,
-        "regtype": MB_NONE,
-        "encoding": "u32",
-        "default": 0,
-        "on_error": ON_ERROR_DEFAULT,
-    },
-    {
-        "name": "product_name",
-        "path": "/ProductName",
-        "address": None,
-        "length": 0,
-        "regtype": MB_NONE,
-        "encoding": "ascii",
-        "default": "Growatt 3-Phase Inverter",
-        "on_error": ON_ERROR_DEFAULT,
-    },
-    {
-        "name": "product_id_default",
-        "path": "/ProductId",
-        "address": None,
-        "length": 0,
-        "regtype": MB_NONE,
-        "encoding": "u32",
-        "default": 0xA14A,
-        "on_error": ON_ERROR_DEFAULT,
-    },
-    {
-        "name": "position",
-        "path": "/Position",
-        "address": None,
-        "length": 0,
-        "regtype": MB_NONE,
-        "encoding": "u32",
-        "default": POSITION,
-        "on_error": ON_ERROR_DEFAULT,
-    },
 ]
 
 
@@ -507,6 +464,11 @@ class GrowattDbus:
         self.service.add_path("/FroniusDeviceType", 73)
         self.service.add_path("/Info/LimiterModel", 123)
         self.service.add_path("/Info/MeasurementModel", 113)
+
+        self.service.add_path("/IsGenericEnergyMeter", 0)
+        self.service.add_path("/ProductName", "Growatt 3-Phase Inverter")
+        self.service.add_path("/ProductId", 41282)
+        self.service.add_path("/Position", POSITION)
 
         # ====================================================
         # Device Information
