@@ -20,7 +20,7 @@ HOST = "192.168.11.68"
 PORT = 502
 UNIT_ID = 2
 
-DEVICE_INSTANCE = 40
+DEVICE_INSTANCE = 48
 POLL_INTERVAL_MS = 1000
 
 POSITION = 1
@@ -497,6 +497,16 @@ class GrowattDbus:
             "/Mgmt/Connection",
             f"Modbus TCP {HOST}:{PORT}, unit {UNIT_ID}",
         )
+
+        # ====================================================
+        # Product information based on Fronius DBus service, but with some fields left empty or with default values.
+        # ====================================================
+        self.service.add_path("/Ac/NumberOfPhases", 3)
+        self.service.add_path("/CustomName", "")
+        self.service.add_path("/DataManagerVersion", "1.2.3.4.5.6")
+        self.service.add_path("/FroniusDeviceType", 73)
+        self.service.add_path("/Info/LimiterModel", 123)
+        self.service.add_path("/Info/MeasurementModel", 113)
 
         # ====================================================
         # Device Information
