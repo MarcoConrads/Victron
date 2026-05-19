@@ -728,7 +728,7 @@ class GrowattDbus:
             MB_HOLDING: {},
         }
 
-        client = ModbusTcpClient(HOST, port=PORT, timeout=3)
+        client = ModbusTcpClient(HOST, port=PORT, timeout=1)
         try:
             if not client.connect():
                 raise RuntimeError("Modbus TCP connect failed")
