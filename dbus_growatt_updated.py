@@ -25,7 +25,7 @@ POLL_INTERVAL_MS = 1000
 
 POSITION = 1
 
-MAX_POWER_W = 10000
+DEFAULT_MAX_POWER_W = 10000
 
 # Modbus register types
 MB_INPUT = "input"
@@ -38,12 +38,16 @@ ON_ERROR_KEEP = "keep"
 
 MAX_REGISTERS_PER_READ = 125
 
+# Holding register for total active power limit.
+# The register expects a value from 0 to 100 percent.
+REG_POWER_LIMIT_TOTAL = 3
+
 
 # ============================================================
 # Growatt Modbus Registers
 # ============================================================
 # Required fields per REG item:
-# - path: DBus path
+# - path: DBus path or list of DBus paths
 # - address: Modbus address
 # - length: number of 16-bit Modbus registers
 # - regtype: input, holding, or None
@@ -109,7 +113,7 @@ REG = [
         "regtype": MB_INPUT,
         "encoding": "u32",
         "default": 0.0,
-        "on_error": ON_ERROR_KEEP,
+        "on_error": ON_ERROR_DEFAULT,
         "scale": 10.0,
     },
     {
@@ -120,7 +124,7 @@ REG = [
         "regtype": MB_INPUT,
         "encoding": "u32",
         "default": 0.0,
-        "on_error": ON_ERROR_KEEP,
+        "on_error": ON_ERROR_DEFAULT,
         "scale": 10.0,
     },
     {
@@ -131,7 +135,7 @@ REG = [
         "regtype": MB_INPUT,
         "encoding": "s32",
         "default": 0.0,
-        "on_error": ON_ERROR_KEEP,
+        "on_error": ON_ERROR_DEFAULT,
         "scale": 10.0,
     },
 
@@ -144,7 +148,7 @@ REG = [
         "regtype": MB_INPUT,
         "encoding": "u32",
         "default": 0.0,
-        "on_error": ON_ERROR_KEEP,
+        "on_error": ON_ERROR_DEFAULT,
         "scale": 10.0,
     },
     {
@@ -155,7 +159,7 @@ REG = [
         "regtype": MB_INPUT,
         "encoding": "u32",
         "default": 0.0,
-        "on_error": ON_ERROR_KEEP,
+        "on_error": ON_ERROR_DEFAULT,
         "scale": 10.0,
     },
     {
@@ -166,7 +170,7 @@ REG = [
         "regtype": MB_INPUT,
         "encoding": "s32",
         "default": 0.0,
-        "on_error": ON_ERROR_KEEP,
+        "on_error": ON_ERROR_DEFAULT,
         "scale": 10.0,
     },
 
@@ -179,7 +183,7 @@ REG = [
         "regtype": MB_INPUT,
         "encoding": "s32",
         "default": 0.0,
-        "on_error": ON_ERROR_KEEP,
+        "on_error": ON_ERROR_DEFAULT,
         "scale": 10.0,
     },
     {
@@ -205,10 +209,26 @@ REG = [
         "scale": 10.0,
     },
 
+    {
+        "name": "power_limit_percent",
+        "path": "/Ac/PowerLimit",
+        "address": REG_POWER_LIMIT_TOTAL,
+        "length": 1,
+        "regtype": MB_HOLDING,
+        "encoding": "u32",
+        "default": 0.0,
+        "on_error": ON_ERROR_KEEP,
+        "internal": True,
+    },
+
     # Grid / phase values used directly or for derived DBus values
     {
         "name": "grid_freq",
-        "path": "/Ac/L1/Frequency",
+        "path": [
+            "/Ac/L1/Frequency",
+            "/Ac/L2/Frequency",
+            "/Ac/L3/Frequency",
+        ],
         "address": 37,
         "length": 1,
         "regtype": MB_INPUT,
@@ -316,42 +336,7 @@ REG = [
         "on_error": ON_ERROR_KEEP,
         "scale": 10.0,
     },
-    {
-        "name": "voltageRS",
-        "path": "/_Internal/VoltageRS",
-        "address": 50,
-        "length": 1,
-        "regtype": MB_INPUT,
-        "encoding": "u32",
-        "default": 0.0,
-        "on_error": ON_ERROR_KEEP,
-        "scale": 10.0,
-        "internal": True,
-    },
-    {
-        "name": "voltageST",
-        "path": "/_Internal/VoltageST",
-        "address": 51,
-        "length": 1,
-        "regtype": MB_INPUT,
-        "encoding": "u32",
-        "default": 0.0,
-        "on_error": ON_ERROR_KEEP,
-        "scale": 10.0,
-        "internal": True,
-    },
-    {
-        "name": "voltageTR",
-        "path": "/_Internal/VoltageTR",
-        "address": 52,
-        "length": 1,
-        "regtype": MB_INPUT,
-        "encoding": "u32",
-        "default": 0.0,
-        "on_error": ON_ERROR_KEEP,
-        "scale": 10.0,
-        "internal": True,
-    },
+
 
     # Paths without a Modbus register. These always write their default value.
     {
@@ -396,10 +381,6 @@ REG = [
     },
 ]
 
-
-# Holding register for total active power limit
-REG_POWER_LIMIT_TOTAL = 3
-POWER_LIMIT_SCALE = 100
 
 
 def u32(registers, index):
@@ -505,6 +486,7 @@ class GrowattDbus:
         self.service = VeDbusService(service_name, register=False)
         self.modbus_messages = build_modbus_messages(REG)
         self.last_values = {}
+        self.max_power_w = DEFAULT_MAX_POWER_W
 
         # ====================================================
         # Management
@@ -522,26 +504,22 @@ class GrowattDbus:
         self.service.add_path("/DeviceInstance", DEVICE_INSTANCE)
         self.service.add_path("/Connected", 0)
 
-        # Add all DBus paths from REG. Internal helper values are not exported.
+        # Add all DBus paths from REG. A path may be a string or a list.
         added_paths = set()
         for reg in REG:
             if reg.get("internal"):
                 continue
-            path = reg["path"]
-            if path not in added_paths:
-                self.service.add_path(path, reg["default"])
-                added_paths.add(path)
+            for path in self.get_paths(reg):
+                if path not in added_paths:
+                    self.service.add_path(path, reg["default"])
+                    added_paths.add(path)
 
         # ====================================================
         # Derived DBus paths
         # ====================================================
-        self.service.add_path("/Ac/Current", 0.0)
-        self.service.add_path("/Ac/Voltage", 0.0)
         self.service.add_path("/Ac/L1/Energy/Forward", 0.0)
         self.service.add_path("/Ac/L2/Energy/Forward", 0.0)
         self.service.add_path("/Ac/L3/Energy/Forward", 0.0)
-        self.service.add_path("/Ac/L2/Frequency", 0.0)
-        self.service.add_path("/Ac/L3/Frequency", 0.0)
 
         # ====================================================
         # Writable Total Power Limit
@@ -556,10 +534,23 @@ class GrowattDbus:
         self.write_default_values_for_none_registers()
         self.service.register()
 
+    @staticmethod
+    def get_paths(reg):
+        path = reg["path"]
+        if isinstance(path, (list, tuple)):
+            return path
+        return [path]
+
+    def write_paths(self, reg, value):
+        if reg.get("internal"):
+            return
+        for path in self.get_paths(reg):
+            self.service[path] = value
+
     def write_default_values_for_none_registers(self):
         for reg in REG:
-            if reg["regtype"] is MB_NONE and not reg.get("internal"):
-                self.service[reg["path"]] = reg["default"]
+            if reg["regtype"] is MB_NONE:
+                self.write_paths(reg, reg["default"])
 
     def read_modbus_message(self, client, message):
         start = message["start"]
@@ -602,12 +593,11 @@ class GrowattDbus:
         """Apply per-register fallback behaviour after a Modbus read error."""
         for reg in REG:
             if reg["regtype"] is MB_NONE:
-                if not reg.get("internal"):
-                    self.service[reg["path"]] = reg["default"]
+                self.write_paths(reg, reg["default"])
                 continue
 
-            if reg["on_error"] == ON_ERROR_DEFAULT and not reg.get("internal"):
-                self.service[reg["path"]] = reg["default"]
+            if reg["on_error"] == ON_ERROR_DEFAULT:
+                self.write_paths(reg, reg["default"])
             # ON_ERROR_KEEP intentionally performs no DBus write action.
 
     def update_dbus_from_modbus(self, data):
@@ -615,8 +605,7 @@ class GrowattDbus:
 
         for reg in REG:
             if reg["regtype"] is MB_NONE:
-                if not reg.get("internal"):
-                    self.service[reg["path"]] = reg["default"]
+                self.write_paths(reg, reg["default"])
                 decoded[reg["name"]] = reg["default"]
                 continue
 
@@ -625,14 +614,16 @@ class GrowattDbus:
                 value = decode_value(reg, values)
                 decoded[reg["name"]] = value
 
-                if not reg.get("internal"):
-                    self.service[reg["path"]] = value
+                self.write_paths(reg, value)
 
             except Exception as e:
                 logging.exception("Decode failed for %s: %s", reg["name"], e)
                 decoded[reg["name"]] = reg["default"]
-                if reg["on_error"] == ON_ERROR_DEFAULT and not reg.get("internal"):
-                    self.service[reg["path"]] = reg["default"]
+                if reg["on_error"] == ON_ERROR_DEFAULT:
+                    self.write_paths(reg, reg["default"])
+
+        if decoded.get("maxpower"):
+            self.max_power_w = float(decoded["maxpower"])
 
         self.write_derived_values(decoded)
 
@@ -645,26 +636,20 @@ class GrowattDbus:
             self.service["/Ac/L2/Energy/Forward"] = phase_energy
             self.service["/Ac/L3/Energy/Forward"] = phase_energy
 
-        l1_current = decoded.get("l1_current")
-        l2_current = decoded.get("l2_current")
-        l3_current = decoded.get("l3_current")
-        if None not in (l1_current, l2_current, l3_current):
-            self.service["/Ac/Current"] = (
-                l1_current + l2_current + l3_current
-            ) / 3.0
+        power_limit_percent = decoded.get("power_limit_percent")
+        if power_limit_percent is not None:
+            power_limit_percent = max(0.0, min(100.0, float(power_limit_percent)))
+            self.service["/Ac/PowerLimit"] = power_limit_percent * self.get_power_limit_scale()
 
-        voltage_rs = decoded.get("voltageRS")
-        voltage_st = decoded.get("voltageST")
-        voltage_tr = decoded.get("voltageTR")
-        if None not in (voltage_rs, voltage_st, voltage_tr):
-            self.service["/Ac/Voltage"] = (
-                voltage_rs + voltage_st + voltage_tr
-            ) / 3.0
 
-        frequency = decoded.get("grid_freq")
-        if frequency is not None:
-            self.service["/Ac/L2/Frequency"] = frequency
-            self.service["/Ac/L3/Frequency"] = frequency
+    def get_power_limit_scale(self):
+        """Return watts per percent point for the 0-100% limit register."""
+        max_power_w = float(self.max_power_w or DEFAULT_MAX_POWER_W)
+
+        if max_power_w <= 0:
+            max_power_w = DEFAULT_MAX_POWER_W
+
+        return max_power_w / 100.0
 
     def set_power_limit(self, path, value):
         try:
@@ -673,10 +658,16 @@ class GrowattDbus:
             if watts < 0:
                 watts = 0
 
-            if watts > MAX_POWER_W:
-                watts = MAX_POWER_W
+            max_power_w = int(float(self.max_power_w or DEFAULT_MAX_POWER_W))
+            if max_power_w <= 0:
+                max_power_w = DEFAULT_MAX_POWER_W
 
-            register_value = int(watts / POWER_LIMIT_SCALE)
+            if watts > max_power_w:
+                watts = max_power_w
+
+            power_limit_scale = self.get_power_limit_scale()
+            register_value = int(round(watts / power_limit_scale))
+            register_value = max(0, min(100, register_value))
 
             client = ModbusTcpClient(HOST, port=PORT, timeout=3)
 
@@ -698,7 +689,12 @@ class GrowattDbus:
                 return False
 
             self.service["/Ac/PowerLimit"] = watts
-            logging.info("3-phase power limit set to %s W", watts)
+            logging.info(
+                "3-phase power limit set to %s W (%s%% of %s W)",
+                watts,
+                register_value,
+                max_power_w,
+            )
             return True
 
         except Exception as e:
