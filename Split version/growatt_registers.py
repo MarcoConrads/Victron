@@ -13,7 +13,7 @@ REG = [
         "default": "",
         "on_error": ON_ERROR_KEEP,
         "setting": "",
-        "setting_path": "/Settings/Devices/Growatt/CustomName",
+        "setting_path": f"/Settings/Devices/Growatt{DEVICE_INSTANCE}/CustomName",
         "writeable": True,
     },
     {
@@ -26,7 +26,7 @@ REG = [
         "default": 1,
         "on_error": ON_ERROR_KEEP,
         "setting": 1,
-        "setting_path": "/Settings/Devices/Growatt/Position",
+        "setting_path": f"/Settings/Devices/Growatt{DEVICE_INSTANCE}/Position",
         "setting_min": 0,
         "setting_max": 2,
         "writeable": True,
