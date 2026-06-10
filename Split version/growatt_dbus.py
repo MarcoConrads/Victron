@@ -1,19 +1,31 @@
+#!/usr/bin/env python3
+# /data/dbus-growatt/dbus_growatt.py
+
 import logging
+import sys
 
-from pymodbus.client.sync import ModbusTcpClient
+from gi.repository import GLib
+import dbus.mainloop.glib
 
-from base_modbus_dbus import BaseModbusDbus
-from config import (
+sys.path.insert(0, "/opt/victronenergy/dbus-systemcalc-py/ext/velib_python")
+sys.path.insert(0, "/data/velib_python")
+
+from growatt_dbus_config import (
     DEFAULT_MAX_POWER_W,
+    POLL_INTERVAL_MS,
     DEVICE_INSTANCE,
     HOST,
     PORT,
     REG_POWER_LIMIT_TOTAL,
     UNIT_ID,
 )
-from growatt_registers import REG
 
-class GrowattDbus(BaseModbusDbus):
+import logging
+from pymodbus.client.sync import ModbusTcpClient
+from base_modbus_dbus import BaseModbusDbus
+from growatt_dbus_registers import REG
+
+class DbusGrowatt(BaseModbusDbus):
     regs = REG
     host = HOST
     port = PORT
@@ -114,3 +126,19 @@ class GrowattDbus(BaseModbusDbus):
         except Exception as e:
             logging.exception("Power limit update failed: %s", e)
             return False
+
+
+def main():
+    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s: %(message)s",
+    )
+    inverter = DbusGrowatt()
+    GLib.timeout_add(POLL_INTERVAL_MS, inverter.poll)
+    inverter.poll()
+    GLib.MainLoop().run()
+
+
+if __name__ == "__main__":
+    main()
