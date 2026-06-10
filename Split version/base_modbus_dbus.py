@@ -24,14 +24,29 @@ class BaseModbusDbus:
     """Base class with generic DBus, Modbus read and decode behaviour."""
 
     regs = []
-    host = HOST
-    port = PORT
-    unit_id = UNIT_ID
+    host = None
+    port = None
+    unit_id = None
     service_name = None
 
-    def __init__(self):
+    def __init__(self, host=None, port=None, unit_id=None, service_name=None):
+        if host is not None:
+            self.host = host
+        if port is not None:
+            self.port = port
+        if unit_id is not None:
+            self.unit_id = unit_id
+        if service_name is not None:
+            self.service_name = service_name
+
         if not self.service_name:
             raise ValueError("service_name must be set by subclass")
+        if not self.host:
+            raise ValueError("host must be set by subclass or constructor")
+        if self.port is None:
+            raise ValueError("port must be set by subclass or constructor")
+        if self.unit_id is None:
+            raise ValueError("unit_id must be set by subclass or constructor")
 
         self.bus = dbus.SystemBus()
         self.service = VeDbusService(self.service_name, register=False)
