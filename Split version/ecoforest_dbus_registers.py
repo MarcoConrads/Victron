@@ -1,4 +1,4 @@
-from growatt_dbus_config import DEVICE_INSTANCE, HOST, PORT, REG_POWER_LIMIT_TOTAL, UNIT_ID
+from ecoforest_dbus_config import DEVICE_INSTANCE, HOST, PORT, UNIT_ID
 from modbus_types import MB_INPUT_BINARY, MB_HOLDING_REGISTER, MB_INPUT_REGISTER, MB_NONE, ON_ERROR_DEFAULT, ON_ERROR_KEEP
 
 REG = [

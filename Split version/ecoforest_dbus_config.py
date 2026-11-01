@@ -1,4 +1,4 @@
-# Configuration for the Growatt DBus Modbus service.
+# Configuration for the Ecoforest DBus Modbus service.
 
 HOST = "192.168.11.68"
 PORT = 8002

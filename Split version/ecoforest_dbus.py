@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# /data/dbus-growatt/dbus_growatt.py
+# /data/dbus-modbus-drivers/ecoforest_dbus.py
 
 import logging
 import sys
@@ -10,7 +10,7 @@ import dbus.mainloop.glib
 sys.path.insert(0, "/opt/victronenergy/dbus-systemcalc-py/ext/velib_python")
 sys.path.insert(0, "/data/velib_python")
 
-from growatt_dbus_config import (
+from ecoforest_dbus_config import (
     POLL_INTERVAL_MS,
     DEVICE_INSTANCE,
     HOST,
@@ -21,7 +21,7 @@ from growatt_dbus_config import (
 import logging
 from pymodbus.client.sync import ModbusTcpClient
 from base_modbus_dbus import BaseModbusDbus
-from growatt_dbus_registers import REG
+from ecoforest_dbus_registers import REG
 
 class DbusEcoforest(BaseModbusDbus):
     regs = REG
