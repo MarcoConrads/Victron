@@ -87,6 +87,8 @@ class ModbusValueCodec:
             value = cls.i16(raw_values, 0)
         elif encoding == "u16":
             value = cls.u16(raw_values, 0)
+        elif encoding == "version":
+            value = ".".join(str(cls.u16(raw_values, i)) for i in range(length))
         elif encoding == "sum_i16":
             value = cls.sum_i16(raw_values)
         elif encoding == "sum_u16":

@@ -1,0 +1,2 @@
+# Cerbo shell scripts must retain Unix line endings on Windows checkouts.
+*.sh text eol=lf

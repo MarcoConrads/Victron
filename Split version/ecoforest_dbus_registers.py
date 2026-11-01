@@ -99,10 +99,10 @@ REG = [
     {
         "name": "firmware_version",
         "path": "/FirmwareVersion",
-        "address": 9,
+        "address": 5285,
         "length": 3,
-        "regtype": MB_NONE,
-        "encoding": "ascii",
+        "regtype": MB_INPUT_REGISTER,
+        "encoding": "version",
         "default": "0.0.0",
         "on_error": ON_ERROR_KEEP,
     },
@@ -124,9 +124,10 @@ REG = [
         "address": 50,
         "length": 1,
         "regtype": MB_INPUT_BINARY,
+        "encoding": "bool",
         "default": 0,
         "on_error": ON_ERROR_KEEP,
-        "map": {0: 1, 1: 0},
+        "map": {0: 10, 1: 7},
     },
     {
         "name": "temperature",
@@ -163,6 +164,7 @@ REG = [
         "on_error": ON_ERROR_KEEP,
         "scale": 1,
     },
+    # Sum electrical consumption for January through December (5168-5179).
     {
         "name": "total_energy",
         "path": "/Ac/Energy/Forward",
