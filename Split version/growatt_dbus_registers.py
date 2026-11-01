@@ -85,16 +85,6 @@ REG = [
         "on_error": ON_ERROR_KEEP,
     },
     {
-        "name": "fronius_device_type",
-        "path": "/FroniusDeviceType",
-        "address": None,
-        "length": 0,
-        "regtype": MB_NONE,
-        "encoding": None,
-        "default": 73,
-        "on_error": ON_ERROR_KEEP,
-    },
-    {
         "name": "limiter_model",
         "path": "/Info/LimiterModel",
         "address": None,

@@ -34,6 +34,14 @@ class ModbusValueCodec:
         return value
 
     @staticmethod
+    def s64(registers, index=0):
+        """Combine four big-endian words into a signed 64-bit integer."""
+        value = 0
+        for offset in range(4):
+            value = (value << 16) | ModbusValueCodec.u16(registers, index + offset)
+        return value - (1 << 64) if value >= (1 << 63) else value
+
+    @staticmethod
     def sum_u16(registers):
         """Sum multiple unsigned 16-bit register values."""
         return sum(ModbusValueCodec.u16(registers, index) for index in range(len(registers)))
@@ -87,6 +95,12 @@ class ModbusValueCodec:
             value = cls.decode_ascii_registers(raw_values, 0, length)
         elif encoding == "s32":
             value = cls.s32(raw_values, 0)
+        elif encoding == "s64":
+            value = cls.s64(raw_values, 0)
+        elif encoding == "utf8":
+            raw_bytes = b"".join(cls.u16(raw_values, i).to_bytes(2, "big")
+                                 for i in range(length))
+            value = raw_bytes.decode("utf-8", errors="replace").rstrip("\x00 ")
         elif encoding == "u32":
             value = cls.u32(raw_values, 0)
         elif encoding == "string":
