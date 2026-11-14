@@ -81,9 +81,9 @@ REG = [
         "length": 0,
         "regtype": MB_NONE,
         "encoding": None,
-        "default": 0000,
+        "default": 49155,
         "on_error": ON_ERROR_KEEP,
-    },
+    },    
     {
         "name": "deviceinstance",
         "path": "/DeviceInstance",
