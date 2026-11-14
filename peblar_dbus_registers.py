@@ -122,7 +122,7 @@ REG = [
         "length": 0,
         "regtype": MB_NONE,
         "encoding": None,
-        "default": 0xB0B1,
+        "default": 49155,
         "on_error": ON_ERROR_KEEP,
     },
     {
